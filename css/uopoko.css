@@ -1,0 +1,21 @@
+@font-face {
+	font-family: moon;
+	src: url('../assets/Moon2.0-Regular.otf') format("opentype");
+}
+@font-face {
+	font-family: alber;
+	src: url('../assets/AlberNew-Regular.ttf') format("truetype");
+}
+
+*,
+*:after,
+*:before {
+	box-sizing: border-box;
+	padding: 0;
+	margin: 0;
+}
+
+html, body {
+  font-family: alber;
+  font-size: 12px;
+}
