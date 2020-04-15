@@ -21,7 +21,6 @@ let gamestate = 'running';
 const BASE_SCORE = 1000; //for popping orbs
 const GRAVITY = 2;
 
-
 //const COLOR_STACKED = '#795548';
 const COLOR_SHIFT = [
   '#7f7f7f',//grey
@@ -37,14 +36,13 @@ const COLOR_SHIFT = [
 // create engine
 var engine = Engine.create(),
     world = engine.world;
-    //world.gravity.y = 0;
 
 // create renderer
 var reWi = pcWidth();
 var reHi = pcHeight();
 console.warn(reWi, reHi);
 
-const ORB_SIZE = reHi*0.5/7/2;
+const ORB_SIZE = reHi/14;
 
 var render = Render.create({
     element: document.querySelector('.container__Matter'),
@@ -95,30 +93,31 @@ world.gravity.y = GRAVITY;
 /*
 Uo Poko's original screen layout is 6.5 orbs wide, and about 15 orbs high
 So let's see what 100vh x 50vh gives us
+Maybe start passing width as a custom parameter, because I can't just call it without having to calc bounds
 */
-var w_bot = buildRect(reWi*0.5, reHi, reWi, 2*ORB_SIZE, { 
+var w_bot = buildRect(reWi*0.5, reHi, reWi, ORB_SIZE, { 
   label: 'floor',
   isStatic: true,
   render: {
     //fillStyle: 'transparent'
   }
 });
-var w_top = buildRect(reWi*0.5, 0, reWi, 2*ORB_SIZE, { 
+var w_top = buildRect(reWi*0.5, 0, reWi, ORB_SIZE, { 
   label: 'ceiling',
   isStatic: true,
   render: {
     //fillStyle: 'transparent'
   }
 });
-var w_left = buildRect(reWi*0.25, reHi*0.5, 2*ORB_SIZE, reHi, {
+var w_left = buildRect(reWi*0.25, reHi*0.5, ORB_SIZE, reHi, {
   label: "wall",
   isStatic: true,
   render: {
     //fillStyle: 'transparent'
   }
 });
-var w_right_x = (reWi*0.25)+(6.5*2*ORB_SIZE)+(2*ORB_SIZE); //hold 6.5 orbs, and offset for half of both walls' width
-var w_right = buildRect(w_right_x, (reHi*0.5)+(ORB_SIZE*3), 2*ORB_SIZE, reHi, {
+var w_right_x = (reWi*0.25)+(6.5*ORB_SIZE)+(ORB_SIZE); //hold 6.5 orbs, and offset for half of both walls' width
+var w_right = buildRect(w_right_x, (reHi*0.5)+(ORB_SIZE*1.5), ORB_SIZE, reHi, {
   label: "wall",
   isStatic: true,
   chamfer: {
@@ -128,7 +127,7 @@ var w_right = buildRect(w_right_x, (reHi*0.5)+(ORB_SIZE*3), 2*ORB_SIZE, reHi, {
     //fillStyle: 'transparent'
   }
 });
-var w_right_2 = buildRect(w_right_x+(4*ORB_SIZE), reHi*0.5, 2*ORB_SIZE, reHi, {
+var w_right_2 = buildRect(w_right_x+(2*ORB_SIZE), reHi*0.5, ORB_SIZE, reHi, {
   label: "wall",
   isStatic: true,
   render: {
@@ -147,15 +146,18 @@ World.add(world, [
 var debug_rows = 6;
 for (let debug_rows = 0; debug_rows < 6; debug_rows++) {
   for (let debug_orbs = 0; debug_orbs < 7; debug_orbs++) {
-    World.add(world, buildCircle((reWi*0.5), (reHi-ORB_SIZE)-(ORB_SIZE*debug_rows*2), ORB_SIZE, {
+    World.add(world, buildCircle((reWi*0.5), (reHi-ORB_SIZE/2)-(ORB_SIZE*debug_rows), 0.5*ORB_SIZE, {
       label: "ball"
     }));
   }
 }
   
 // invisible pusher(s)
-var launcher_spot = w_right.position.x+ORB_SIZE+ORB_SIZE;
-var launcher_hori = buildRect(launcher_spot, w_top.bounds.max.y+ORB_SIZE, 2*ORB_SIZE, 2*ORB_SIZE, {
+// my inital plan was to have the hori pusher have variable force
+// but now i realize i should have a vert down-pusher that moves left/right & resets
+// mouse-drag anywhere on the right lane to move the down-pusher. Render draw a guide line
+var launcher_spot = w_right.position.x+ORB_SIZE;
+var pusher_left = buildRect(launcher_spot, w_top.bounds.max.y+(0.5*ORB_SIZE), ORB_SIZE, ORB_SIZE, {
   label: "pusher_left",
   isSensor: true,
   isStatic: true,
@@ -163,7 +165,7 @@ var launcher_hori = buildRect(launcher_spot, w_top.bounds.max.y+ORB_SIZE, 2*ORB_
     fillStyle: '#ff00ff33'
   }
 });
-var launcher_vert = buildRect(launcher_spot, w_bot.bounds.min.y-ORB_SIZE, 2*ORB_SIZE, 2*ORB_SIZE, {
+var pusher_up = buildRect(launcher_spot, w_bot.bounds.min.y-(0.5*ORB_SIZE), ORB_SIZE, ORB_SIZE, {
   label: "pusher_up",
   isSensor: true,
   isStatic: true,
@@ -171,9 +173,18 @@ var launcher_vert = buildRect(launcher_spot, w_bot.bounds.min.y-ORB_SIZE, 2*ORB_
     fillStyle: '#ff00ff33'
   }
 });
+var pusher_down = buildRect(launcher_spot, w_bot.bounds.min.y-(0.5*ORB_SIZE), ORB_SIZE, ORB_SIZE, {
+  label: "pusher_down",
+  isSensor: true,
+  isStatic: true,
+  render: {
+    fillStyle: '#ff00ff33'
+  }
+});
 World.add(world, [
-  launcher_hori,
-  launcher_vert
+  pusher_left,
+  pusher_up,
+  pusher_down
 ]);
 
 // TODO recalc coords; base it off the rightmostwall?
