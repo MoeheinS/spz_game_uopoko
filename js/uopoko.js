@@ -86,6 +86,7 @@ Render.lookAt(render, {
 });
 
 world.gravity.y = GRAVITY;
+engine.enableSleeping = true;
 
 /*
 *   Actual physics objects
@@ -109,15 +110,14 @@ var w_top = buildRect(reWi*0.5, 0, reWi, ORB_SIZE, {
     //fillStyle: 'transparent'
   }
 });
-var w_left = buildRect(reWi*0.25, reHi*0.5, ORB_SIZE, reHi, {
+var w_right_2 = buildRect(reWi, reHi*0.5, ORB_SIZE, reHi, {
   label: "wall",
   isStatic: true,
   render: {
     //fillStyle: 'transparent'
   }
 });
-var w_right_x = (reWi*0.25)+(6.5*ORB_SIZE)+(ORB_SIZE); //hold 6.5 orbs, and offset for half of both walls' width
-var w_right = buildRect(w_right_x, (reHi*0.5)+(ORB_SIZE*1.5), ORB_SIZE, reHi, {
+var w_right = buildRect(w_right_2.bounds.min.x-(1.5*ORB_SIZE), (reHi*0.5)+(ORB_SIZE*1.5), ORB_SIZE, reHi, {
   label: "wall",
   isStatic: true,
   chamfer: {
@@ -127,13 +127,15 @@ var w_right = buildRect(w_right_x, (reHi*0.5)+(ORB_SIZE*1.5), ORB_SIZE, reHi, {
     //fillStyle: 'transparent'
   }
 });
-var w_right_2 = buildRect(w_right_x+(2*ORB_SIZE), reHi*0.5, ORB_SIZE, reHi, {
+var w_left = buildRect(w_right.bounds.min.x-(7*ORB_SIZE), reHi*0.5, ORB_SIZE, reHi, {
   label: "wall",
   isStatic: true,
   render: {
     //fillStyle: 'transparent'
   }
 });
+
+
 World.add(world, [
   w_bot,
   w_top,
@@ -144,11 +146,18 @@ World.add(world, [
 
 // orbs
 var debug_rows = 6;
-for (let debug_rows = 0; debug_rows < 6; debug_rows++) {
-  for (let debug_orbs = 0; debug_orbs < 7; debug_orbs++) {
-    World.add(world, buildCircle((reWi*0.5), (reHi-ORB_SIZE/2)-(ORB_SIZE*debug_rows), 0.5*ORB_SIZE, {
-      label: "ball"
-    }));
+for (let debug_rows = 0; debug_rows < 9; debug_rows++) {
+  for (let debug_orbs = 0; debug_orbs < 6; debug_orbs++) {
+    World.add(world, 
+      buildCircle(
+        w_right.bounds.min.x-(debug_orbs*ORB_SIZE)-(Math.floor((debug_rows%2)*0.5*ORB_SIZE))-0.5*ORB_SIZE, 
+        reHi-(ORB_SIZE)-(ORB_SIZE*debug_rows), 
+        0.5*ORB_SIZE, {
+          label: "ball"
+          //isStatic: true
+        }
+      )
+    );
   }
 }
   
@@ -157,7 +166,7 @@ for (let debug_rows = 0; debug_rows < 6; debug_rows++) {
 // but now i realize i should have a vert down-pusher that moves left/right & resets
 // mouse-drag anywhere on the right lane to move the down-pusher. Render draw a guide line
 var launcher_spot = w_right.position.x+ORB_SIZE;
-var pusher_left = buildRect(launcher_spot, w_top.bounds.max.y+(0.5*ORB_SIZE), ORB_SIZE, ORB_SIZE, {
+var pusher_left = buildRect(launcher_spot, w_top.position.y+ORB_SIZE, ORB_SIZE, ORB_SIZE, {
   label: "pusher_left",
   isSensor: true,
   isStatic: true,
@@ -165,7 +174,7 @@ var pusher_left = buildRect(launcher_spot, w_top.bounds.max.y+(0.5*ORB_SIZE), OR
     fillStyle: '#ff00ff33'
   }
 });
-var pusher_up = buildRect(launcher_spot, w_bot.bounds.min.y-(0.5*ORB_SIZE), ORB_SIZE, ORB_SIZE, {
+var pusher_up = buildRect(launcher_spot, w_bot.position.y-ORB_SIZE, ORB_SIZE, ORB_SIZE, {
   label: "pusher_up",
   isSensor: true,
   isStatic: true,
@@ -173,13 +182,16 @@ var pusher_up = buildRect(launcher_spot, w_bot.bounds.min.y-(0.5*ORB_SIZE), ORB_
     fillStyle: '#ff00ff33'
   }
 });
-var pusher_down = buildRect(launcher_spot, w_bot.bounds.min.y-(0.5*ORB_SIZE), ORB_SIZE, ORB_SIZE, {
+var pusher_down_initial_x = launcher_spot-2*ORB_SIZE;
+var pusher_down = buildRect(pusher_down_initial_x, w_top.position.y+ORB_SIZE, ORB_SIZE, ORB_SIZE, {
   label: "pusher_down",
   isSensor: true,
   isStatic: true,
   render: {
     fillStyle: '#ff00ff33'
-  }
+  },
+  activated: false, //determines movement
+  activatable: true
 });
 World.add(world, [
   pusher_left,
@@ -193,6 +205,25 @@ World.add(world, [
 /*
 *   Functions
 */
+// go to sleep
+window.setTimeout(function(){
+  sleepRay();
+}, 500);
+function sleepRay(){
+  var bods = Composite.allBodies(world);
+  for( bod of bods ){
+    if(bod.label == 'ball'){
+      Sleeping.set(bod, true);
+    }
+  }
+}
+
+function resetLauncher(){
+  Body.setPosition(pusher_down, { y: pusher_down.position.y, x: pusher_down_initial_x });
+  Body.setVelocity(pusher_down, { y: 0, x: 0 });
+  pusher_down.activatable = true;
+}
+
 function launchOrb() {
   // spring tension builds as the launcher button is held
   // basically the curver brick moves away until it can't no more
@@ -214,6 +245,28 @@ function collisionHandler(stackItem, bodyB){
 document.addEventListener("keydown", function(e){
   switch (e.key) {
     case 'ArrowDown':
+      if(pusher_down.activatable){
+        pusher_down.activated = true;
+      }
+      break;
+    case 's':
+      sleepRay();
+      break;
+    case 'r':
+      resetLauncher();
+      break;
+    default:
+      console.log(e.key);
+      break;
+  }
+});
+
+document.addEventListener("keyup", function(e){
+  switch (e.key) {
+    case 'ArrowDown':
+      pusher_down.activatable = false;
+      pusher_down.activated = false;
+      console.log('sproing!');
       break;
     default:
       console.log(e.key);
@@ -224,7 +277,17 @@ document.addEventListener("keydown", function(e){
 /*
 *   Lifecycle events
 */
-Events.on(engine, 'beforeUpdate', function(event) {});
+Events.on(engine, 'beforeUpdate', function(event) {
+  if(pusher_down.activated){
+    if( pusher_down.bounds.min.x > w_left.bounds.max.x ){
+      Body.setPosition(pusher_down, { y: pusher_down.position.y, x: pusher_down.position.x-(ORB_SIZE/10) });
+      Body.setVelocity(pusher_down, { y: 0, x: 0 });
+    }else{
+      Body.setPosition(pusher_down, { y: pusher_down.position.y, x: w_left.position.x+ORB_SIZE });
+      Body.setVelocity(pusher_down, { y: 0, x: 0 });
+    }
+  }
+});
 
 Events.on(engine, 'collisionStart', function(event) {
   for( pair of event.pairs ){
