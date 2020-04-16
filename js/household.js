@@ -10,7 +10,7 @@ function randomIntFromInterval(min, max) { // min and max included
 }
 
 // equiv to Engine = Matter.Engine;
-const { Bodies, Bounds, Body, Composite, Composites, Constraint, Engine, Events, MouseConstraint, Mouse, Render, Runner, Vector, World } = Matter;
+const { Bodies, Bounds, Body, Composite, Composites, Constraint, Engine, Events, MouseConstraint, Mouse, Render, Runner, Sleeping, Vector, World } = Matter;
 
 function pcWidth(percentage){
   if(typeof(percentage) === 'number'){
