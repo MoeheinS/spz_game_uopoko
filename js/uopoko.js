@@ -145,18 +145,23 @@ World.add(world, [
 ]);
 
 // orbs
+var orb_types = [
+  ['#7f7f7f','grey'],
+  ['#ff0000','red'],
+  ['#00ff00','green'],
+  ['#ffff00','yellow'],
+  ['#0000ff','blue'],
+  ['#ff00ff','fuchsia'],
+  ['#00ffff','aqua'],
+  ['#ffffff','white']
+];
 var debug_rows = 6;
-for (let debug_rows = 0; debug_rows < 9; debug_rows++) {
+for (let debug_rows = 0; debug_rows < 5; debug_rows++) {
   for (let debug_orbs = 0; debug_orbs < 6; debug_orbs++) {
-    World.add(world, 
-      buildCircle(
-        w_right.bounds.min.x-(debug_orbs*ORB_SIZE)-(Math.floor((debug_rows%2)*0.5*ORB_SIZE))-0.5*ORB_SIZE, 
-        reHi-(ORB_SIZE)-(ORB_SIZE*debug_rows), 
-        0.5*ORB_SIZE, {
-          label: "ball"
-          //isStatic: true
-        }
-      )
+    makeOrb(
+      w_right.bounds.min.x-(debug_orbs*ORB_SIZE)-(Math.floor((debug_rows%2)*0.5*ORB_SIZE))-0.5*ORB_SIZE, 
+      reHi-(ORB_SIZE)-(ORB_SIZE*debug_rows),
+      'worldOrb'
     );
   }
 }
@@ -165,6 +170,8 @@ for (let debug_rows = 0; debug_rows < 9; debug_rows++) {
 // my inital plan was to have the hori pusher have variable force
 // but now i realize i should have a vert down-pusher that moves left/right & resets
 // mouse-drag anywhere on the right lane to move the down-pusher. Render draw a guide line
+
+// !! label them all as pusher, set angles on them, and apply velocity in the angle direction??
 var launcher_spot = w_right.position.x+ORB_SIZE;
 var pusher_left = buildRect(launcher_spot, w_top.position.y+ORB_SIZE, ORB_SIZE, ORB_SIZE, {
   label: "pusher_left",
@@ -212,7 +219,7 @@ window.setTimeout(function(){
 function sleepRay(){
   var bods = Composite.allBodies(world);
   for( bod of bods ){
-    if(bod.label == 'ball'){
+    if(bod.label == 'worldOrb'){
       Sleeping.set(bod, true);
     }
   }
@@ -224,17 +231,47 @@ function resetLauncher(){
   pusher_down.activatable = true;
 }
 
-function launchOrb() {
+function makeOrb(px, py, label){
+  var rolledOrbType = Math.floor(Math.random()*orb_types.length);
+  World.add(world, 
+    buildCircle(px, py, 0.5*ORB_SIZE, {
+      label: label,
+      custom: {
+        type: orb_types[rolledOrbType][0]
+      },
+      render: {
+        fillStyle: orb_types[rolledOrbType][1]
+      }
+      //isStatic: true
+    })
+  );
+}
+
+function launchOrb(){
   // spring tension builds as the launcher button is held
   // basically the curver brick moves away until it can't no more
   // then catapult the orb
   // STUB
+  makeOrb(launcher_spot, w_bot.position.y-ORB_SIZE, 'launchedOrb');
 }
 
-function collisionHandler(stackItem, bodyB){
+function collisionHandler(launchedOrb, bodyB){
   switch (bodyB.label) {
-    case 'worldOrb':
+    //case 'worldOrb':
       // STUB
+      //break;
+    case 'pusher_up':
+      Body.setVelocity(launchedOrb, { y: -ORB_SIZE, x: 0 });
+      break;
+    case 'pusher_down':
+      Body.setPosition(launchedOrb, bodyB.position);
+      Body.setVelocity(launchedOrb, { y: ORB_SIZE*0.5, x: 0 });
+      // too soon?
+      resetLauncher();
+      break;
+    case 'pusher_left':
+      Body.setPosition(launchedOrb, bodyB.position);
+      Body.setVelocity(launchedOrb, { y: 0, x: -ORB_SIZE*1.5 });
       break;
     default:
       break;
@@ -267,6 +304,7 @@ document.addEventListener("keyup", function(e){
       pusher_down.activatable = false;
       pusher_down.activated = false;
       console.log('sproing!');
+      launchOrb();
       break;
     default:
       console.log(e.key);
@@ -317,6 +355,10 @@ Events.on(render, 'afterRender', function() {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffffff';
     ctx.fillText('v0.0.1', 100, 20);
+
+    //drop guide
+    ctx.fillStyle = '#ffffff11';
+    ctx.fillRect(pusher_down.bounds.min.x, pusher_down.bounds.min.y, ORB_SIZE, reHi);
 
   Render.endViewTransform(render);
 });
