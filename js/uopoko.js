@@ -16,8 +16,10 @@ if( window.localStorage.getItem('uopokoScore') ){
   hiscore_global = window.localStorage.getItem('uopokoScore');
 }
 let score_global = 0;
-let gamestate = 'running';
+let game_state = 'running';
 let game_debug = true;
+// launcher into popper, back into launcher?
+let game_phase = 'launcher';
 
 const BASE_SCORE = 1000; //for popping orbs
 const GRAVITY = 2;
@@ -310,11 +312,24 @@ function collisionHandler(bodyA, bodyB){
 function dropHandler(bodyA, bodyB){
   switch (bodyB.label) {
     case 'worldOrb':
+      if( game_phase != 'chain' ){
+        game_phase = 'popper';
+      }
       console.warn(bodyA.custom.type, bodyB.custom.type);
-      bodyA.label = 'worldOrb';
+      //bodyA.label = 'worldOrb';
+      
       // iterate over the collision pairs in the world, 
       // get the ID of bodyA, and see if it's in a chain of 3+ same-colored
       // if so, pop-em
+      // set global flag POP-OK; in the render cycle up a counter for 60 ticks
+      // where you're checking pars as above.
+      // at 60 reset the launcher?
+      if( bodyA.custom.type == bodyB.custom.type ){
+        bodyA.label = 'poppable';
+        bodyB.label = 'poppable';
+        Body.setPosition(bodyB, {x: bodyB.position.x, y: bodyB.position.y-10});
+      }
+
       break;
     default:
       break;
@@ -336,7 +351,7 @@ function dropOrb(){
 document.addEventListener("keydown", function(e){
   switch (e.key) {
     case 'ArrowDown':
-      if(pusher_down.activatable){
+      if(pusher_down.activatable && game_phase == 'launcher'){
         pusher_down.activated = true;
       }
       break;
@@ -399,10 +414,18 @@ Events.on(engine, 'collisionStart', function(event) {
       collisionHandler(pair.bodyB, pair.bodyA);
     }
 
-    if( pair.bodyA.label === 'fallingOrb' ){
+    if( pair.bodyA.label === 'fallingOrb' || pair.bodyA.label === 'poppable' ){
       dropHandler(pair.bodyA, pair.bodyB);
-    }else if( pair.bodyB.label === 'fallingOrb' ){
+    }else if( pair.bodyB.label === 'fallingOrb' || pair.bodyB.label === 'poppable'){
       dropHandler(pair.bodyB, pair.bodyA);
+    }
+
+    if( game_phase == 'chain' ){
+      if( pair.bodyA.label === 'worldOrb' || pair.bodyA.label === 'poppable' ){
+        dropHandler(pair.bodyA, pair.bodyB);
+      }else if( pair.bodyB.label === 'worldOrb' || pair.bodyB.label === 'poppable'){
+        dropHandler(pair.bodyB, pair.bodyA);
+      } 
     }
   }
 });
@@ -415,6 +438,8 @@ var tutorial = [
 ]
 
 var stopCounter = 0;
+var counter_pop = 0;
+var count_poppables = 0;
 Events.on(render, 'afterRender', function() {
   var ctx = render.context;
 
@@ -426,8 +451,10 @@ Events.on(render, 'afterRender', function() {
     ctx.fillText('v0.0.1', 100, 20);
 
     //drop guide
-    ctx.fillStyle = '#ffffff11';
-    ctx.fillRect(pusher_down.bounds.min.x, pusher_down.bounds.min.y, ORB_SIZE, reHi);
+    if( game_phase == 'launcher' ){
+      ctx.fillStyle = '#ffffff11';
+      ctx.fillRect(pusher_down.bounds.min.x, pusher_down.bounds.min.y, ORB_SIZE, reHi);
+    }
 
     //debug state rendering
     if(game_debug){
@@ -461,6 +488,49 @@ Events.on(render, 'afterRender', function() {
         }
       }
       */
+    }
+
+    // phase debug
+    ctx.font = '16px alber';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(game_phase, 100, ORB_SIZE);
+    ctx.fillText(counter_pop, 100, ORB_SIZE+18);
+    ctx.fillText(count_poppables, 100, ORB_SIZE+36);
+
+    //TODO poppables should count per color; now it's too sloppy
+    //Also todo, if you fail, move the pusher floor up
+
+    if( game_phase == 'popper' || game_phase == 'chain' ){
+      counter_pop++;
+      if( counter_pop >= 60 ){
+        counter_pop = 0;
+        count_poppables = 0;
+        var bods = Composite.allBodies(world);
+        for( bod of bods ){
+          if(bod.label == 'poppable'){
+            count_poppables++;
+          }
+        }
+        if( count_poppables >= 3 ){
+          for( bod of bods ){
+            if(bod.label == 'poppable'){
+              Composite.remove(world, bod);
+            }
+          }
+          //re-fall?
+          count_poppables = 0;
+          game_phase = 'chain';
+        }else{
+          for( bod of bods ){
+            if(bod.label == 'poppable' || bod.label == 'fallingOrb'){
+              bod.label = 'worldOrb';
+            }
+          }
+          count_poppables = 0;
+          game_phase = 'launcher';
+        }
+      }
     }
 
   Render.endViewTransform(render);
