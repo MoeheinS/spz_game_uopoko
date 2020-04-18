@@ -7,6 +7,10 @@ console.log('%cWelcome. Welcome to papa`s house','color:#ff0000;font-family:Comi
   //Body.setVelocity(stackDropper, { y: 0, x: px - stackDropper.position.x });
   Body.setPosition(stackDropper, { y: 20, x: px });
 */
+
+//convert degrees to radians
+//var rads = 30 * Math.PI*2.0/360.0;
+
 stackItem.friction = 1;
   stackItem.frictionAir = 0.5;
 

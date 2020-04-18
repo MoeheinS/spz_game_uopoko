@@ -297,11 +297,6 @@ function collisionHandler(bodyA, bodyB){
       break;
     case 'pusher_down':
       console.warn('%cdown','color:#ff0000;font-family:Comic Sans MS;');
-      Body.setPosition(bodyA, bodyB.position);
-      Body.setVelocity(bodyA, { y: ORB_SIZE*0.05, x: 0 });
-      // too soon?
-      resetLauncher();
-      launchOrb();
       break;
     case 'pusher_left':
       Body.setPosition(bodyA, bodyB.position);
@@ -310,6 +305,31 @@ function collisionHandler(bodyA, bodyB){
     default:
       break;
   }
+}
+
+function dropHandler(bodyA, bodyB){
+  switch (bodyB.label) {
+    case 'worldOrb':
+      console.warn(bodyA.custom.type, bodyB.custom.type);
+      bodyA.label = 'worldOrb';
+      // iterate over the collision pairs in the world, 
+      // get the ID of bodyA, and see if it's in a chain of 3+ same-colored
+      // if so, pop-em
+      break;
+    default:
+      break;
+  }
+}
+
+function dropOrb(){
+  var fallingOrb = makeOrb(pusher_down.position.x, pusher_down.position.y, 'fallingOrb');
+  fallingOrb.custom.type = launchedOrb.custom.type;
+  fallingOrb.render.fillStyle = launchedOrb.render.fillStyle;
+  var rolledOrbType = Math.floor(Math.random()*orb_types.length);
+  launchedOrb.custom.type = orb_types[rolledOrbType][0];
+  launchedOrb.render.fillStyle = orb_types[rolledOrbType][1];
+  World.add(world, fallingOrb);
+  resetLauncher();
 }
 
 // keydown to move curver brick, keyup to launch orb?
@@ -347,7 +367,6 @@ document.addEventListener("keyup", function(e){
       pusher_down.activatable = false;
       pusher_down.activated = false;
       Body.setPosition(stopper, { y: pusher_up.position.y+ORB_SIZE, x: pusher_up.position.x });
-      //launchOrb();
       break;
     default:
       console.log(e.key);
@@ -378,6 +397,12 @@ Events.on(engine, 'collisionStart', function(event) {
       collisionHandler(pair.bodyA, pair.bodyB);
     }else if( pair.bodyB.label === 'launchedOrb' ){
       collisionHandler(pair.bodyB, pair.bodyA);
+    }
+
+    if( pair.bodyA.label === 'fallingOrb' ){
+      dropHandler(pair.bodyA, pair.bodyB);
+    }else if( pair.bodyB.label === 'fallingOrb' ){
+      dropHandler(pair.bodyB, pair.bodyA);
     }
   }
 });
@@ -422,19 +447,20 @@ Events.on(render, 'afterRender', function() {
     if(launchedOrb){
       // SOMETHING broke the collision detection on pusher_down, hence this hack
       if(launchedOrb.position.x <= pusher_down.position.x && pusher_down.activated == false ){
-        Body.setPosition(launchedOrb, pusher_down.position);
-        Body.setVelocity(launchedOrb, { y: ORB_SIZE*0.05, x: 0 });
-        resetLauncher();
-        launchOrb();
+        Body.setPosition(launchedOrb, {x: stopper.position.x, y: w_bot.position.y-(3*ORB_SIZE)});
+        Body.setVelocity(launchedOrb, { y: 0, x: 0 });
+        dropOrb();
       }
-      if(launchedOrb.velocity.x <= ((Math.random()/9000)*(Math.random()/9000)) && launchedOrb.velocity.y <= ((Math.random()/9000)*(Math.random()/9000)) && launchedOrb.position.x < w_right.position.x ){
+      /*
+      if(launchedOrb.velocity.x <= 0.1 && launchedOrb.velocity.y <= 0.1 && launchedOrb.position.x < w_right.position.x ){
         stopCounter++;
         if(stopCounter >= 10){
           stopCounter = 0;
-          petrify(null, launchedOrb, true);
+          //petrify(null, launchedOrb, true);
           launchedOrb.label = 'worldOrb';
         }
       }
+      */
     }
 
   Render.endViewTransform(render);
