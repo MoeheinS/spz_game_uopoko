@@ -270,10 +270,10 @@ function makeOrb(px, py, label){
   return buildCircle(px, py, 0.5*ORB_SIZE, {
     label: label,
     custom: {
-      type: orb_types[rolledOrbType][0]
+      typeColor: orb_types[rolledOrbType][1]
     },
     render: {
-      fillStyle: orb_types[rolledOrbType][1]
+      fillStyle: orb_types[rolledOrbType][0]
     }
   });
 }
@@ -315,7 +315,7 @@ function dropHandler(bodyA, bodyB){
       if( game_phase != 'chain' ){
         game_phase = 'popper';
       }
-      console.warn(bodyA.custom.type, bodyB.custom.type);
+      //console.warn(bodyA.custom.typeColor, bodyB.custom.typeColor);
       //bodyA.label = 'worldOrb';
       
       // iterate over the collision pairs in the world, 
@@ -324,10 +324,12 @@ function dropHandler(bodyA, bodyB){
       // set global flag POP-OK; in the render cycle up a counter for 60 ticks
       // where you're checking pars as above.
       // at 60 reset the launcher?
-      if( bodyA.custom.type == bodyB.custom.type ){
+      if( bodyA.custom.typeColor == bodyB.custom.typeColor ){
         bodyA.label = 'poppable';
         bodyB.label = 'poppable';
         Body.setPosition(bodyB, {x: bodyB.position.x, y: bodyB.position.y-10});
+        Body.setPosition(bodyB, {x: bodyB.position.x+10, y: bodyB.position.y});
+        Body.setPosition(bodyB, {x: bodyB.position.x-20, y: bodyB.position.y});
       }
 
       break;
@@ -338,11 +340,11 @@ function dropHandler(bodyA, bodyB){
 
 function dropOrb(){
   var fallingOrb = makeOrb(pusher_down.position.x, pusher_down.position.y, 'fallingOrb');
-  fallingOrb.custom.type = launchedOrb.custom.type;
+  fallingOrb.custom.typeColor = launchedOrb.custom.typeColor;
   fallingOrb.render.fillStyle = launchedOrb.render.fillStyle;
   var rolledOrbType = Math.floor(Math.random()*orb_types.length);
-  launchedOrb.custom.type = orb_types[rolledOrbType][0];
-  launchedOrb.render.fillStyle = orb_types[rolledOrbType][1];
+  launchedOrb.custom.typeColor = orb_types[rolledOrbType][1];
+  launchedOrb.render.fillStyle = orb_types[rolledOrbType][0];
   World.add(world, fallingOrb);
   resetLauncher();
 }
@@ -439,7 +441,17 @@ var tutorial = [
 
 var stopCounter = 0;
 var counter_pop = 0;
-var count_poppables = 0;
+var count_poppables = {
+  grey: 0,
+  red: 0,
+  green: 0,
+  yellow: 0,
+  blue: 0,
+  fuchsia: 0,
+  aqua: 0,
+  white: 0
+};
+
 Events.on(render, 'afterRender', function() {
   var ctx = render.context;
 
@@ -496,40 +508,58 @@ Events.on(render, 'afterRender', function() {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(game_phase, 100, ORB_SIZE);
     ctx.fillText(counter_pop, 100, ORB_SIZE+18);
-    ctx.fillText(count_poppables, 100, ORB_SIZE+36);
+    
+    var blep = 18;
+    for (let [key, value] of Object.entries(count_poppables)) {
+      blep = blep+18;
+      ctx.fillText(`${key}:${value}`, 100, ORB_SIZE+blep);
+    }
 
     //TODO poppables should count per color; now it's too sloppy
     //Also todo, if you fail, move the pusher floor up
 
     if( game_phase == 'popper' || game_phase == 'chain' ){
       counter_pop++;
-      if( counter_pop >= 60 ){
-        counter_pop = 0;
-        count_poppables = 0;
+      if( counter_pop >= 30 ){
+        //counter_pop = 0;
+        //count_poppables = 0;
+        count_poppables = {grey: 0,red: 0,green: 0,yellow: 0,blue: 0,fuchsia: 0,aqua: 0,white: 0};
         var bods = Composite.allBodies(world);
         for( bod of bods ){
           if(bod.label == 'poppable'){
-            count_poppables++;
+            //count_poppables++;
+            count_poppables[bod.custom.typeColor]++;
           }
         }
-        if( count_poppables >= 3 ){
-          for( bod of bods ){
-            if(bod.label == 'poppable'){
-              Composite.remove(world, bod);
+        // go over the poppables; >3 means we can remove 
+        var next_phase = 'launcher';
+        for (let [key, value] of Object.entries(count_poppables)) {
+          if( value >= 3 ){
+            console.warn(`popping ${key}:${value}`);
+            var bods = Composite.allBodies(world);
+            for( bod of bods ){
+              if(bod.label == 'poppable' && bod.custom.typeColor == key){
+                console.error(bod);
+                Composite.remove(world, bod);
+              }
             }
-          }
-          //re-fall?
-          count_poppables = 0;
-          game_phase = 'chain';
-        }else{
-          for( bod of bods ){
-            if(bod.label == 'poppable' || bod.label == 'fallingOrb'){
-              bod.label = 'worldOrb';
+            //re-fall?
+            //count_poppables[key] = 0;
+            next_phase = 'chain';
+          }else{
+            for( bod of bods ){
+              if(bod.label == 'poppable' || bod.label == 'fallingOrb'){
+                if(bod.custom.typeColor == key){
+                  bod.label = 'worldOrb';
+                }
+              }
             }
+            //count_poppables[key] = 0;
+            //game_phase = 'launcher';
           }
-          count_poppables = 0;
-          game_phase = 'launcher';
-        }
+        } 
+        game_phase = next_phase;
+        counter_pop = 0;
       }
     }
 
