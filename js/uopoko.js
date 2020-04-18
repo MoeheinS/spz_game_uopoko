@@ -17,6 +17,7 @@ if( window.localStorage.getItem('uopokoScore') ){
 }
 let score_global = 0;
 let gamestate = 'running';
+let game_debug = true;
 
 const BASE_SCORE = 1000; //for popping orbs
 const GRAVITY = 2;
@@ -158,11 +159,11 @@ var orb_types = [
 var debug_rows = 6;
 for (let debug_rows = 0; debug_rows < 5; debug_rows++) {
   for (let debug_orbs = 0; debug_orbs < 6; debug_orbs++) {
-    makeOrb(
+    World.add(world, makeOrb(
       w_right.bounds.min.x-(debug_orbs*ORB_SIZE)-(Math.floor((debug_rows%2)*0.5*ORB_SIZE))-0.5*ORB_SIZE, 
-      reHi-(ORB_SIZE)-(ORB_SIZE*debug_rows),
+      w_bot.bounds.min.y-(0.5*ORB_SIZE)-(0.85*ORB_SIZE*debug_rows),
       'worldOrb'
-    );
+    ));
   }
 }
   
@@ -206,6 +207,15 @@ World.add(world, [
   pusher_down
 ]);
 
+var stopper = buildRect(launcher_spot, w_bot.position.y-(2*ORB_SIZE), ORB_SIZE, ORB_SIZE, {
+  label: "stopper",
+  isStatic: true,
+  render: {
+    fillStyle: '#ff0000'
+  }
+});
+World.add(world, [stopper]);
+
 // TODO recalc coords; base it off the rightmostwall?
 // Things also get silly when widescreen, so the major calc-unit should be height-based
 
@@ -214,8 +224,9 @@ World.add(world, [
 */
 // go to sleep
 window.setTimeout(function(){
-  sleepRay();
+  //petrify('worldOrb', null, true);
 }, 500);
+
 function sleepRay(){
   var bods = Composite.allBodies(world);
   for( bod of bods ){
@@ -225,26 +236,44 @@ function sleepRay(){
   }
 }
 
+//label, target, boolean
+function petrify(label, t, boo){
+  if(label){
+    var bods = Composite.allBodies(world);
+    for( bod of bods ){
+      if(bod.label == label){
+        Body.setStatic(bod, boo);
+        if(!boo){
+          Sleeping.set(bod, true);
+        }
+      }
+    }
+  }else if(t){
+    Body.setStatic(t, boo);
+    if(!boo){
+      Sleeping.set(t, true);
+    }
+  }
+}
+
 function resetLauncher(){
   Body.setPosition(pusher_down, { y: pusher_down.position.y, x: pusher_down_initial_x });
   Body.setVelocity(pusher_down, { y: 0, x: 0 });
   pusher_down.activatable = true;
+  Body.setPosition(stopper, { y: pusher_up.position.y-ORB_SIZE, x: pusher_up.position.x });
 }
 
 function makeOrb(px, py, label){
   var rolledOrbType = Math.floor(Math.random()*orb_types.length);
-  World.add(world, 
-    buildCircle(px, py, 0.5*ORB_SIZE, {
-      label: label,
-      custom: {
-        type: orb_types[rolledOrbType][0]
-      },
-      render: {
-        fillStyle: orb_types[rolledOrbType][1]
-      }
-      //isStatic: true
-    })
-  );
+  return buildCircle(px, py, 0.5*ORB_SIZE, {
+    label: label,
+    custom: {
+      type: orb_types[rolledOrbType][0]
+    },
+    render: {
+      fillStyle: orb_types[rolledOrbType][1]
+    }
+  });
 }
 
 function launchOrb(){
@@ -252,26 +281,31 @@ function launchOrb(){
   // basically the curver brick moves away until it can't no more
   // then catapult the orb
   // STUB
-  makeOrb(launcher_spot, w_bot.position.y-ORB_SIZE, 'launchedOrb');
+  Body.setPosition(stopper, { y: pusher_up.position.y-ORB_SIZE, x: pusher_up.position.x });
+  launchedOrb = makeOrb(launcher_spot, w_bot.position.y-(3*ORB_SIZE), 'launchedOrb');
+  World.add(world, launchedOrb);
 }
+launchOrb();
 
-function collisionHandler(launchedOrb, bodyB){
+function collisionHandler(bodyA, bodyB){
   switch (bodyB.label) {
     //case 'worldOrb':
       // STUB
       //break;
     case 'pusher_up':
-      Body.setVelocity(launchedOrb, { y: -ORB_SIZE, x: 0 });
+      Body.setVelocity(bodyA, { y: -ORB_SIZE, x: 0 });
       break;
     case 'pusher_down':
-      Body.setPosition(launchedOrb, bodyB.position);
-      Body.setVelocity(launchedOrb, { y: ORB_SIZE*0.5, x: 0 });
+      console.warn('%cdown','color:#ff0000;font-family:Comic Sans MS;');
+      Body.setPosition(bodyA, bodyB.position);
+      Body.setVelocity(bodyA, { y: ORB_SIZE*0.05, x: 0 });
       // too soon?
       resetLauncher();
+      launchOrb();
       break;
     case 'pusher_left':
-      Body.setPosition(launchedOrb, bodyB.position);
-      Body.setVelocity(launchedOrb, { y: 0, x: -ORB_SIZE*1.5 });
+      Body.setPosition(bodyA, bodyB.position);
+      Body.setVelocity(bodyA, { y: 0, x: -ORB_SIZE*1.5 });
       break;
     default:
       break;
@@ -289,6 +323,15 @@ document.addEventListener("keydown", function(e){
     case 's':
       sleepRay();
       break;
+    case 'd':
+      game_debug = !game_debug;
+      break;
+    case 'o':
+      petrify('worldOrb', null, true);
+      break;
+    case 'p':
+      petrify('worldOrb', null, false);
+      break;
     case 'r':
       resetLauncher();
       break;
@@ -303,8 +346,8 @@ document.addEventListener("keyup", function(e){
     case 'ArrowDown':
       pusher_down.activatable = false;
       pusher_down.activated = false;
-      console.log('sproing!');
-      launchOrb();
+      Body.setPosition(stopper, { y: pusher_up.position.y+ORB_SIZE, x: pusher_up.position.x });
+      //launchOrb();
       break;
     default:
       console.log(e.key);
@@ -346,6 +389,7 @@ var tutorial = [
   'STUB'
 ]
 
+var stopCounter = 0;
 Events.on(render, 'afterRender', function() {
   var ctx = render.context;
 
@@ -359,6 +403,39 @@ Events.on(render, 'afterRender', function() {
     //drop guide
     ctx.fillStyle = '#ffffff11';
     ctx.fillRect(pusher_down.bounds.min.x, pusher_down.bounds.min.y, ORB_SIZE, reHi);
+
+    //debug state rendering
+    if(game_debug){
+      ctx.font = '10px alber';
+      ctx.fillStyle = '#000000';
+      var bods = Composite.allBodies(world);
+      for( bod of bods ){
+        ctx.fillText(`vel:${bod.velocity.x.toFixed(2)};${bod.velocity.y.toFixed(2)}`, bod.position.x, bod.position.y-12);
+        ctx.fillText(bod.label, bod.position.x, bod.position.y);
+        ctx.fillText('slp:'+bod.isSleeping, bod.position.x, bod.position.y+12);
+        ctx.fillText('stt:'+bod.isStatic, bod.position.x, bod.position.y+24);
+      }
+    }
+
+    // alternatively launchedOrb can be a permanent, which creates a worldOrb clone when stopped
+    // and then teleports back to the launcher
+    if(launchedOrb){
+      // SOMETHING broke the collision detection on pusher_down, hence this hack
+      if(launchedOrb.position.x <= pusher_down.position.x && pusher_down.activated == false ){
+        Body.setPosition(launchedOrb, pusher_down.position);
+        Body.setVelocity(launchedOrb, { y: ORB_SIZE*0.05, x: 0 });
+        resetLauncher();
+        launchOrb();
+      }
+      if(launchedOrb.velocity.x <= ((Math.random()/9000)*(Math.random()/9000)) && launchedOrb.velocity.y <= ((Math.random()/9000)*(Math.random()/9000)) && launchedOrb.position.x < w_right.position.x ){
+        stopCounter++;
+        if(stopCounter >= 10){
+          stopCounter = 0;
+          petrify(null, launchedOrb, true);
+          launchedOrb.label = 'worldOrb';
+        }
+      }
+    }
 
   Render.endViewTransform(render);
 });
