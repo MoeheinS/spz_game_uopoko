@@ -305,7 +305,7 @@ function collisionHandler(bodyA, bodyB){
       break;
     case 'pusher_left':
       Body.setPosition(bodyA, bodyB.position);
-      Body.setVelocity(bodyA, { y: 0, x: -ORB_SIZE*1.5 });
+      Body.setVelocity(bodyA, { y: 0, x: -ORB_SIZE });
       break;
     default:
       break;
